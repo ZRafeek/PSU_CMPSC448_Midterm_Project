@@ -3,11 +3,13 @@ from dataset import llm_models
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
-    confusion_matrix
+    confusion_matrix,
+    ConfusionMatrixDisplay
 )
 
-def evaluate(model: torch.nn.Module, loader, device):
+def evaluate(model: torch.nn.Module, loader, device, filename):
 
+    ret_value = ""
     model.eval()
 
     predictions = []
@@ -24,18 +26,13 @@ def evaluate(model: torch.nn.Module, loader, device):
             predictions.extend(predicted.cpu().tolist())
             actual.extend(y.tolist())
 
-    print(
-        classification_report(
-            actual,
-            predictions,
-            target_names=llm_models
-        )
-    )
+    ret_value +=  classification_report(actual, predictions, target_names=llm_models).__str__()
+    ret_value += "\n"
 
-    print(
-        confusion_matrix(
-            actual,
-            predictions
-        )
-    )
-    pass
+    cm = confusion_matrix(actual,predictions)
+    ret_value += cm.__str__()
+
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=llm_models)
+    disp.plot().figure_.savefig("results/"+filename+"_confusion_matrix.png")
+
+    return ret_value

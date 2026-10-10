@@ -30,6 +30,15 @@ dataset_encoding = 'utf-8-sig'
 responses = 'data/processed/responses.csv'
 tableHeader = ["prompt","response","llm","category","prompt_id"]
 
+dataset_categories = [
+    "Computer Science" ,"Engineering & energy", "Economics & finance", "Sociology",
+    "Business & Management", "Pharmacy & Medicine", "English Language", "Law & Legal Studies", "Botany",
+    "Criminology", "Disaster Science", "Geography & Environment", "Graphic Design", "History", "Information Science",
+    "International Relations", "Mass Communication & Journalism", "Nuclear Engineering", "Philosophy", "Physics",
+    "Political Science", "Psychology", "Robotics & AI", "Statistics", "Film & Photography", "Theatre", "Tourism & Hospitality", 
+    "Gender Studies", "Agriculture", "Zoology"
+    ]
+
 def pre_process_dataset():
     dataset_responses_per_model = 3000
 

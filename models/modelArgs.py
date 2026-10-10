@@ -6,27 +6,29 @@ class ModelType(StrEnum):
 
 class InputType(StrEnum):
     OUTPUT = 'output'
-    PRMOPT = 'prompt'
+    PROMPT = 'prompt'
     COMBINED = 'combined'
+
+class TraningSeparatorType(StrEnum):
+    PROMPT = 'prompt_id'
+    CATEGORY = 'category'
 
 class ModelArguments:
 
     def __init__(self):
-        self.model = 'cnn'
-        self.input = 'output'
+        self.model = ModelType.CNN
+        self.input = InputType.OUTPUT
         self.epochs = 10
         self.batch_size = 32
         self.seed = 45
+        self.fileName = "Default"
+        self.trainingSeparator = TraningSeparatorType.PROMPT
 
     def setModel(self, model:ModelType):
-        models = ['cnn', 'ltsm']
-        if model in models:
-            self.model = model
+        self.model = model
 
     def setInput(self, input:InputType):
-        inputs = ['output', 'prompt', 'combined']
-        if input in inputs:
-            self.input = input
+        self.input = input
 
     def setEpochs(self, epochs:int):
         self.epochs = epochs
@@ -36,3 +38,9 @@ class ModelArguments:
 
     def setSeed(self, seed:int):
         self.seed = seed
+
+    def setFileName(self, filename:str):
+        self.fileName = filename
+    
+    def setTrainingSeparator(self, trainingSeparator:TraningSeparatorType):
+            self.trainingSeparator = trainingSeparator
