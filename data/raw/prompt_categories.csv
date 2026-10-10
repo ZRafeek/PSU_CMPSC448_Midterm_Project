@@ -1,0 +1,30 @@
+0001, 0100, Computer Science
+0101, 0200, Engineering & energy
+0201, 0300, Economics & finance
+0301, 0400, Sociology
+0401, 0500, Business & Management
+0501, 0600, Pharmacy & Medicine
+0601, 0700, English Language
+0701, 0800, Law & Legal Studies
+0801, 0900, Botany
+0901, 1000, Criminology
+1001, 1100, Disaster Science
+1101, 1200,	Geography & Environment
+1201, 1300,	Graphic Design
+1301, 1400,	History
+1401, 1500,	Information Science
+1501, 1600,	International Relations
+1601, 1700,	Mass Communication & Journalism
+1701, 1800,	Nuclear Engineering
+1801, 1900,	Philosophy
+1901, 2000,	Physics
+2001, 2100,	Political Science
+2101, 2200,	Psychology
+2201, 2300,	Robotics & AI
+2301, 2400,	Statistics
+2401, 2500,	Film & Photography
+2501, 2600,	Theatre
+2601, 2700,	Tourism & Hospitality
+2701, 2800,	Gender Studies
+2801, 2900,	Agriculture
+2901, 3000,	Zoology
