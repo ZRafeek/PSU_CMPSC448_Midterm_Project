@@ -177,7 +177,7 @@ def runModel(args : ModelArguments):
 def main():
     RQ = 1
     args = ModelArguments()
-    args.setEpochs(1)
+    # args.setEpochs(1)
     for RQ in range(1,4):
         if RQ == 1:
             '''
@@ -242,7 +242,7 @@ def main():
             args.setTrainingSeparator(TraningSeparatorType.CATEGORY)
             runModel(args)
 
-            args.setModel(ModelType.CNN)
+            args.setModel(ModelType.LTSM)
             args.setFileName("RQ3_RNN")
             args.setInput(InputType.OUTPUT)
             args.setTrainingSeparator(TraningSeparatorType.CATEGORY)
