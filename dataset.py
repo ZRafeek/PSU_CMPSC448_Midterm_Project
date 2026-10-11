@@ -60,7 +60,7 @@ def pre_process_TXD_dataset():
         for row in spamreader:
             rows+=1
             model = row[2]
-            if model in llm_models:
+            if model in llm_models_rw:
                 promptID = (rows-1)%dataset_responses_per_model
                 prompt = row[0]
                 response = row[1]

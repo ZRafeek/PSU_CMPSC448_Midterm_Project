@@ -6,14 +6,14 @@ Classes:
 ChatGPT, Claude, Llama
               precision    recall  f1-score   support
 
-     ChatGPT       0.33      0.91      0.48      3000
-      Claude       0.47      0.07      0.13      3000
-       Llama       0.75      0.07      0.13      3000
+     ChatGPT       0.33      0.86      0.48      3000
+      Claude       0.46      0.14      0.21      3000
+       Llama       0.87      0.09      0.16      3000
 
-    accuracy                           0.35      9000
-   macro avg       0.52      0.35      0.25      9000
-weighted avg       0.52      0.35      0.25      9000
+    accuracy                           0.36      9000
+   macro avg       0.55      0.36      0.28      9000
+weighted avg       0.55      0.36      0.28      9000
 
-[[2727  212   61]
- [2773  218    9]
- [2753   33  214]]
+[[2571  398   31]
+ [2582  410    8]
+ [2653   91  256]]
