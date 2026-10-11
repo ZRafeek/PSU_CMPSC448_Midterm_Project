@@ -1,13 +1,15 @@
 import torch
-from dataset import llm_models
+from models.modelArgs import ModelType
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
     confusion_matrix,
     ConfusionMatrixDisplay
 )
+from models.cnn import CNN
+from models.ltsm import LTSM
 
-def evaluate(model: torch.nn.Module, loader, device, filename, labels):
+def evaluate(model: torch.nn.Module, loader, device, filename, labels, modelType):
 
     ret_value = ""
     model.eval()
@@ -15,16 +17,26 @@ def evaluate(model: torch.nn.Module, loader, device, filename, labels):
     predictions = []
     actual = []
 
-    with torch.no_grad():
+    if modelType == ModelType.CNN:
+        with torch.no_grad():
+            for x, y in loader:
+                x = x.to(device)
+                output = model(x)
 
-        for x, y in loader:
-            x = x.to(device)
-            output = model(x)
+                predicted = output.argmax(dim=1)
 
-            predicted = output.argmax(dim=1)
+                predictions.extend(predicted.cpu().tolist())
+                actual.extend(y.tolist())
+    else:
+        with torch.no_grad():
+            for x, lengths, y in loader:
+                x = x.to(device)
+                output = model(x, lengths)
 
-            predictions.extend(predicted.cpu().tolist())
-            actual.extend(y.tolist())
+                predicted = output.argmax(dim=1)
+
+                predictions.extend(predicted.cpu().tolist())
+                actual.extend(y.tolist())
 
     ret_value +=  classification_report(actual, predictions, target_names=labels).__str__()
     ret_value += "\n"

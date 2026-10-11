@@ -1,4 +1,5 @@
 import random
+import time
 
 import torch
 import pandas as pd
@@ -9,7 +10,7 @@ from models.modelArgs import ModelArguments, ModelType, InputType, TraningSepara
 from models.cnn import CNN
 from models.ltsm import LTSM
 from torch.utils.data import DataLoader, Subset, random_split
-from dataset import LLMResponseDataset, collate_fn, build_vocab
+from dataset import LLMResponseDataset, collate_fn_cnn, collate_fn_ltsm, build_vocab
 
 from dataset import responses as txd_data_csv_file
 from dataset import tableHeader, tableHeader_rw, dataset_encoding
@@ -17,6 +18,7 @@ from dataset import tableHeader, tableHeader_rw, dataset_encoding
 from dataset import responses_rw as lmsys_data_csv_file
 
 from evaluate import evaluate
+from sklearn.model_selection import train_test_split
 
 from train import train_model
 
@@ -91,16 +93,29 @@ def split_data(args : ModelArguments, llm_data, resultsFile):
         data = llm_data.sample(frac = 1, random_state = args.seed).reset_index(drop=True)
         # random.shuffle(data)
 
-        train_end = int(0.70 * len(data))
-        val_end = int(0.85 * len(data))
+        # Split 70% training, 30% temporary
+        all_indices = list(range(len(data)))
 
-        train_indicies = list(range(train_end))
-        val_indicies = list(range(train_end,val_end))
-        test_indicies = list(range(val_end, len(data)))
+        train_indicies, temp_indices = train_test_split(
+            all_indices,
+            test_size=0.30,
+            random_state=args.seed,
+            stratify=data["llm"]
+        )
+
+        # Split the remaining 30% into 15% validation and 15% test
+        val_indicies, test_indicies = train_test_split(
+            temp_indices,
+            test_size=0.50,
+            random_state=args.seed,
+            stratify=data.iloc[temp_indices]["llm"]
+        )
 
     return train_indicies, val_indicies, test_indicies
 
 def runModel(args : ModelArguments):
+    start_time = time.time()
+    print("\nNow Running "+args.fileName+":")
     resultsFile = open("results/"+args.fileName+".txt", 'w')
     
     set_seed(args.seed)
@@ -114,7 +129,6 @@ def runModel(args : ModelArguments):
     label_to_id = {
         label: index for index, label in enumerate(label_names)
     }
-    print(label_to_id)
 
     llm_data["label"] = llm_data['llm'].map(label_to_id)
 
@@ -142,9 +156,12 @@ def runModel(args : ModelArguments):
         llm_labels=label_to_id
     )
 
-    train_data_loader = DataLoader(Subset(dataset, train_indicies), batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
-    val_data_loader = DataLoader(Subset(dataset, val_indicies), batch_size=args.batch_size, collate_fn=collate_fn)
-    test_data_loader = DataLoader(Subset(dataset, test_indicies), batch_size=args.batch_size, collate_fn=collate_fn)
+    train_data_loader = DataLoader(Subset(dataset, train_indicies), batch_size=args.batch_size, shuffle=True, 
+                                   collate_fn=collate_fn_cnn if args.model == ModelType.CNN else collate_fn_ltsm)
+    val_data_loader = DataLoader(Subset(dataset, val_indicies), batch_size=args.batch_size, 
+                                 collate_fn=collate_fn_cnn if args.model == ModelType.CNN else collate_fn_ltsm)
+    test_data_loader = DataLoader(Subset(dataset, test_indicies), batch_size=args.batch_size, 
+                                  collate_fn=collate_fn_cnn if args.model == ModelType.CNN else collate_fn_ltsm)
 
     num_classes = len(label_names)
     vocab_size = len(vocab)
@@ -171,7 +188,7 @@ def runModel(args : ModelArguments):
 
     # Train Model
     print("Training Model...")
-    train_model(model=model, train_loader=train_data_loader, val_loader=val_data_loader, device=device, epochs=args.epochs)
+    train_model(model=model, train_loader=train_data_loader, val_loader=val_data_loader, device=device, epochs=args.epochs, modelType=args.model)
 
     # Evaluate
     print("\nResults")
@@ -185,18 +202,20 @@ def runModel(args : ModelArguments):
     resultsFile.writelines([", ".join(label_names)])
     resultsFile.write("\n")
 
-    evaluation = evaluate(model=model, loader=test_data_loader, device=device, filename=args.fileName, labels=label_names)
+    evaluation = evaluate(model=model, loader=test_data_loader, device=device, filename=args.fileName, labels=label_names, modelType=args.model)
     print(evaluation)
     resultsFile.writelines([evaluation])
 
     resultsFile.close()
     torch.save(model.state_dict(), "results/"+args.fileName+".pt")
+    print(f"Model {args.fileName} took {time.time() - start_time} seconds")
 
 
 def main():
     # RQ = 1
+    start_time = time.time()
     args = ModelArguments()
-    args.setEpochs(1)
+    # args.setEpochs(1)
     for RQ in range(1,4):
     # RQ = 2
         if RQ == 1:
@@ -279,7 +298,8 @@ def main():
         else:
             print('Invalid RQ given, defaulting to Running base model')
         
-    print("FINISHED")
+    print("\nFINISHED")
+    print(f"Took: {time.time() - start_time} seconds")
 
 if __name__ == "__main__":
     main()

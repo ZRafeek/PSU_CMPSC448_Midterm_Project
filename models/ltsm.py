@@ -1,5 +1,6 @@
 import torch
 import torch.nn as NeuralNetwork
+from torch.nn.utils.rnn import pack_padded_sequence
 
 class LTSM(NeuralNetwork.Module):
     
@@ -12,11 +13,13 @@ class LTSM(NeuralNetwork.Module):
         
         pass
 
-    def forward(self, x):
+    def forward(self, x, lengths):
         
         x = self.embedding(x)
 
-        output, (hidden, cell) = self.ltsm(x)
+        packed = pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
+
+        _, (hidden, cell) = self.ltsm(packed)
 
         x = hidden[-1]
 

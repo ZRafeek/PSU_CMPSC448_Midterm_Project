@@ -29,6 +29,8 @@ dataset_categories = [
     "Gender Studies", "Agriculture", "Zoology"
     ]
 
+# LMSYS Judging LLM-as-a-judge with MT-Bench and Chatbot Arena
+# https://huggingface.co/datasets/lmsys/chatbot_arena_conversations
 responses_rw = 'data/processed/LMSYS_responses.csv'
 tableHeader_rw = ["prompt", "response", "llm"]
 
@@ -104,9 +106,6 @@ lmsys_llms = {
 }
 def pre_process_LMSYS_dataset():
     df = pd.read_parquet("hf://datasets/lmsys/chatbot_arena_conversations/data/train-00000-of-00001-cced8514c7ed782a.parquet")
-    # csv_writer = csv.writer(open(responses_rw, 'w', newline='', encoding=dataset_encoding), 
-    #                         delimiter=',', quotechar='\"', quoting=csv.QUOTE_MINIMAL)
-    # csv_writer.writerow(tableHeader_rw)
     rows = []
 
     # preprocessing
@@ -208,7 +207,7 @@ class LLMResponseDataset(Dataset):
 
     pass
 
-def collate_fn(batch):
+def collate_fn_cnn(batch):
     sequences, labels = zip(*batch)
 
     sequences = pad_sequence(list(sequences), batch_first=True, padding_value=0)
@@ -216,8 +215,26 @@ def collate_fn(batch):
 
     return sequences, labels
 
+def collate_fn_ltsm(batch):
+    sequences, labels = zip(*batch)
+
+    lengths = torch.tensor(
+        [len(seq) for seq in sequences],
+        dtype=torch.long
+    )
+
+    sequences = pad_sequence(
+        list(sequences),
+        batch_first=True,
+        padding_value=0
+    )
+
+    labels = torch.stack(labels)
+
+    return sequences, lengths, labels
+
 if __name__ == '__main__':
-    # pre_process_TXD_dataset()
-    # print("Finished Pre-processing the TXD Dataset!")
+    pre_process_TXD_dataset()
+    print("Finished Pre-processing the TXD Dataset!")
     pre_process_LMSYS_dataset()
     print("Finished Pre-processing the LMSYS Dataset!")
