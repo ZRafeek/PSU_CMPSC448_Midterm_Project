@@ -1,4 +1,3 @@
-# import argparse
 import random
 
 import torch
@@ -11,8 +10,12 @@ from models.cnn import CNN
 from models.ltsm import LTSM
 from torch.utils.data import DataLoader, Subset, random_split
 from dataset import LLMResponseDataset, collate_fn, build_vocab
-from dataset import responses as data_csv_file
-from dataset import tableHeader, dataset_encoding
+
+from dataset import responses as txd_data_csv_file
+from dataset import tableHeader, tableHeader_rw, dataset_encoding
+
+from dataset import responses_rw as lmsys_data_csv_file
+
 from evaluate import evaluate
 
 from train import train_model
@@ -25,7 +28,8 @@ def set_seed(seed = 45):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-def split_data(separator : TraningSeparatorType, llm_data, resultsFile):
+def split_data(args : ModelArguments, llm_data, resultsFile):
+    separator = args.trainingSeparator
     if separator == TraningSeparatorType.PROMPT:
         print("Splitting Data Set by prompt_id")
         question_ids = llm_data["prompt_id"].unique().tolist()
@@ -51,7 +55,7 @@ def split_data(separator : TraningSeparatorType, llm_data, resultsFile):
             i for i, qid in enumerate(llm_data["prompt_id"])
             if qid in test_ids
         ]
-    else:
+    elif separator == TraningSeparatorType.CATEGORY:
         print("Splitting Data Set by category")
         category_label = llm_data["category"].unique().tolist()
         random.shuffle(category_label)
@@ -82,6 +86,18 @@ def split_data(separator : TraningSeparatorType, llm_data, resultsFile):
         resultsFile.writelines([', '.join(val_ids), "\n"])
         resultsFile.write("Test Categories:\n")
         resultsFile.writelines([', '.join(test_ids), "\n"])
+    else:
+        print("Using real-world data, no determinable splits possible")
+        data = llm_data.sample(frac = 1, random_state = args.seed).reset_index(drop=True)
+        # random.shuffle(data)
+
+        train_end = int(0.70 * len(data))
+        val_end = int(0.85 * len(data))
+
+        train_indicies = list(range(train_end))
+        val_indicies = list(range(train_end,val_end))
+        test_indicies = list(range(val_end, len(data)))
+
     return train_indicies, val_indicies, test_indicies
 
 def runModel(args : ModelArguments):
@@ -90,13 +106,15 @@ def runModel(args : ModelArguments):
     set_seed(args.seed)
 
     print("Setting up LLM Data")
-    llm_data = pd.read_csv(data_csv_file, encoding=dataset_encoding)
-    llm_data = llm_data.dropna(subset=tableHeader)
+    llm_data = pd.read_csv(lmsys_data_csv_file if args.trainingSeparator == TraningSeparatorType.REAL_WORLD else txd_data_csv_file, encoding=dataset_encoding)
+    
+    llm_data = llm_data.dropna(subset=tableHeader_rw if args.trainingSeparator == TraningSeparatorType.REAL_WORLD else tableHeader)
 
     label_names = sorted(llm_data["llm"].unique())
     label_to_id = {
         label: index for index, label in enumerate(label_names)
     }
+    print(label_to_id)
 
     llm_data["label"] = llm_data['llm'].map(label_to_id)
 
@@ -110,7 +128,7 @@ def runModel(args : ModelArguments):
             " [RESPONSE] "+llm_data["response"].astype(str)
         )
 
-    train_indicies, val_indicies, test_indicies = split_data(args.trainingSeparator, llm_data, resultsFile)
+    train_indicies, val_indicies, test_indicies = split_data(args, llm_data, resultsFile)
 
     # Build Vocabulary from training data
     print("Building vocabulary")
@@ -120,7 +138,8 @@ def runModel(args : ModelArguments):
     dataset = LLMResponseDataset(
         data=llm_data,
         vocab=vocab,
-        input_type=args.input
+        input_type=args.input,
+        llm_labels=label_to_id
     )
 
     train_data_loader = DataLoader(Subset(dataset, train_indicies), batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
@@ -166,7 +185,7 @@ def runModel(args : ModelArguments):
     resultsFile.writelines([", ".join(label_names)])
     resultsFile.write("\n")
 
-    evaluation = evaluate(model=model, loader=test_data_loader, device=device, filename=args.fileName)
+    evaluation = evaluate(model=model, loader=test_data_loader, device=device, filename=args.fileName, labels=label_names)
     print(evaluation)
     resultsFile.writelines([evaluation])
 
@@ -175,16 +194,18 @@ def runModel(args : ModelArguments):
 
 
 def main():
-    RQ = 1
+    # RQ = 1
     args = ModelArguments()
-    # args.setEpochs(1)
+    args.setEpochs(1)
     for RQ in range(1,4):
+    # RQ = 2
         if RQ == 1:
             '''
             RQ1 — Can we identify which LLM generated a response?
             Use LLM_output as input, conduct classification to detect which LLM
             generated it. Report the performance of your CNN & RNN performance
             '''
+            args.setTrainingSeparator(TraningSeparatorType.PROMPT)
             args.setModel(ModelType.CNN)
             args.setFileName("RQ1_CNN")
             runModel(args)
@@ -199,7 +220,16 @@ def main():
             i) Can the LLM be predicted from the user's prompt even before seeing its response? 
             ii) Does including the input improve classification? 
             iii) If input-only classification works surprisingly well, why might this happen?
+
+            ** Note that for more realistic values, a different dataset is used here.
+            This data set only has responses from:
+            ChatGPT: 8820
+            Claude: 5574
+            Llama: 1787
+
+            For fairness, each model is limited to 1787 sets of data
             '''
+            args.setTrainingSeparator(TraningSeparatorType.REAL_WORLD)
             args.setModel(ModelType.CNN)
             args.setFileName("RQ2_CNN_Prompt")
             args.setInput(InputType.PROMPT)
@@ -236,20 +266,19 @@ def main():
             ii) Are some models more consistently identifiable across domains? 
             iii) Is the classifier learning a general LLM fingerprint or task-specific patterns?
             '''
+            args.setTrainingSeparator(TraningSeparatorType.CATEGORY)
             args.setModel(ModelType.CNN)
             args.setFileName("RQ3_CNN")
             args.setInput(InputType.OUTPUT)
-            args.setTrainingSeparator(TraningSeparatorType.CATEGORY)
             runModel(args)
 
             args.setModel(ModelType.LTSM)
             args.setFileName("RQ3_RNN")
             args.setInput(InputType.OUTPUT)
-            args.setTrainingSeparator(TraningSeparatorType.CATEGORY)
             runModel(args)
         else:
             print('Invalid RQ given, defaulting to Running base model')
-    
+        
     print("FINISHED")
 
 if __name__ == "__main__":

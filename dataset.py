@@ -2,10 +2,10 @@
 import csv
 import bisect
 import re
+import pandas as pd
 
 # Create the vocabulary for the Neural Network models
 from collections import Counter
-from typing import Any
 # Create the Dataset object that torch can use
 import torch
 from torch.utils.data import Dataset
@@ -13,23 +13,13 @@ from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 
 llm_models = ['ChatGPT', 'Gemini', 'Grok', 'DeepSeek', 'Qwen', 'Claude', 'Llama']
-llm_labels = {
-    "ChatGPT": 0,
-    'Gemini': 1, 
-    'Grok': 2, 
-    'DeepSeek': 3, 
-    'Qwen': 4, 
-    'Claude': 5, 
-    'Llama':6
-}
 
 # TXD-22 A Large-Scale Benchmark Dataset
 # https://data.mendeley.com/datasets/prcjcggtjf/1
 dataset = 'data/raw/TXD-22 A Large-Scale Benchmark Dataset.csv'
 dataset_encoding = 'utf-8-sig'
-responses = 'data/processed/responses.csv'
+responses = 'data/processed/TXD_responses.csv'
 tableHeader = ["prompt","response","llm","category","prompt_id"]
-
 dataset_categories = [
     "Computer Science" ,"Engineering & energy", "Economics & finance", "Sociology",
     "Business & Management", "Pharmacy & Medicine", "English Language", "Law & Legal Studies", "Botany",
@@ -39,7 +29,10 @@ dataset_categories = [
     "Gender Studies", "Agriculture", "Zoology"
     ]
 
-def pre_process_dataset():
+responses_rw = 'data/processed/LMSYS_responses.csv'
+tableHeader_rw = ["prompt", "response", "llm"]
+
+def pre_process_TXD_dataset():
     dataset_responses_per_model = 3000
 
     responses_file = open(responses, 'w', newline='', encoding=dataset_encoding)
@@ -81,13 +74,76 @@ def pre_process_dataset():
                 category_index = bisect.bisect_right(pID_start, promptID) - 1
                 category = prompt_categories[category_index]
                 csv_writer.writerow([prompt,response,model,category,promptID])
-                pass
-            pass
-        pass
     
     responses_file.close()
 
-    print("Finished Pre-processing!")
+def get_clean_llm_name(model_name):
+    m = model_name.lower()
+    if 'gpt' in m: return llm_models[0]
+    if 'gemini' in m: return llm_models[1]
+    if 'grok' in m: return llm_models[2]
+    if 'deepseek' in m: return llm_models[3]
+    if 'qwen' in m: return llm_models[4]
+    if 'claude' in m: return llm_models[5]
+    if 'llama' in m: return llm_models[6]
+    return None
+
+def extract_first_assistant_response(conversation_list):
+    # Dig through the conversation array to find the first AI turn
+    if conversation_list is None:
+        return ""
+    for msg in conversation_list:
+        if msg.get('role') == 'assistant':
+            return msg.get('content', '')
+    return ""
+
+lmsys_llms = {
+    "ChatGPT":0,
+    "Claude":0,
+    "Llama":0
+}
+def pre_process_LMSYS_dataset():
+    df = pd.read_parquet("hf://datasets/lmsys/chatbot_arena_conversations/data/train-00000-of-00001-cced8514c7ed782a.parquet")
+    # csv_writer = csv.writer(open(responses_rw, 'w', newline='', encoding=dataset_encoding), 
+    #                         delimiter=',', quotechar='\"', quoting=csv.QUOTE_MINIMAL)
+    # csv_writer.writerow(tableHeader_rw)
+    rows = []
+
+    # preprocessing
+    def remove_internal_newlines(match):
+        text = match.group(0)
+        cleaned = text.replace('\n', '\\n').replace('\t', "\\t")
+        return cleaned
+
+    for _, row in df.iterrows():
+        if row['language'] != 'English': continue
+        if 'prompt' in row and pd.notna(row['prompt']):
+            prompt_text = row['prompt'].replace("\n", "\\n").replace("\t", "\\t").replace("\r", "")
+        else:
+            prompt_text = row['conversation_a'][0]['content'].replace("\n", "\\n").replace("\t", "\\t").replace("\r", "") if len(row['conversation_a']) > 0 else ''
+
+        llm_a = get_clean_llm_name(row['model_a'])
+        llm_b = get_clean_llm_name(row['model_b'])
+
+        if llm_a and lmsys_llms[llm_a] < 1787:
+            response_a = extract_first_assistant_response(row['conversation_a'])
+            # cleaned_data = re.sub(r'"[^"]*"', remove_internal_newlines, response_a, flags=re.DOTALL)
+            rows.append({"prompt":prompt_text, "response": response_a.replace("\n", "\\n").replace("\t", "\\t").replace("\r", ""), "llm":llm_a})
+            lmsys_llms[llm_a] = lmsys_llms[llm_a]+1
+
+        if llm_b and lmsys_llms[llm_b] < 1787:
+            response_b = extract_first_assistant_response(row['conversation_b'])
+            # cleaned_data = re.sub(r'"[^"]*"', remove_internal_newlines, response_b, flags=re.DOTALL)
+            rows.append({"prompt":prompt_text, "response": response_b.replace("\n", "\\n").replace("\t", "\\t").replace("\r", ""), "llm":llm_b})
+            lmsys_llms[llm_b] = lmsys_llms[llm_b]+1
+
+    print(lmsys_llms)
+    formatted_df = pd.DataFrame(rows, columns=tableHeader_rw)
+
+    formatted_df.to_csv(responses_rw, index=False, encoding=dataset_encoding)
+
+
+    pass
 
 def tokenize(text):
     return text.lower().split()
@@ -117,7 +173,7 @@ def text_to_ids(text, vocab):
 
 class LLMResponseDataset(Dataset):
 
-    def __init__(self, data, vocab, input_type='output'):
+    def __init__(self, data, vocab, llm_labels, input_type='output'):
         self.data = data
         self.vocab = vocab
         self.input_type = input_type
@@ -161,4 +217,7 @@ def collate_fn(batch):
     return sequences, labels
 
 if __name__ == '__main__':
-    pre_process_dataset()
+    # pre_process_TXD_dataset()
+    # print("Finished Pre-processing the TXD Dataset!")
+    pre_process_LMSYS_dataset()
+    print("Finished Pre-processing the LMSYS Dataset!")

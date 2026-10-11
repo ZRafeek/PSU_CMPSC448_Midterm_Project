@@ -7,7 +7,7 @@ from sklearn.metrics import (
     ConfusionMatrixDisplay
 )
 
-def evaluate(model: torch.nn.Module, loader, device, filename):
+def evaluate(model: torch.nn.Module, loader, device, filename, labels):
 
     ret_value = ""
     model.eval()
@@ -26,13 +26,13 @@ def evaluate(model: torch.nn.Module, loader, device, filename):
             predictions.extend(predicted.cpu().tolist())
             actual.extend(y.tolist())
 
-    ret_value +=  classification_report(actual, predictions, target_names=llm_models).__str__()
+    ret_value +=  classification_report(actual, predictions, target_names=labels).__str__()
     ret_value += "\n"
 
     cm = confusion_matrix(actual,predictions)
     ret_value += cm.__str__()
 
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=llm_models)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     disp.plot().figure_.savefig("results/"+filename+"_confusion_matrix.png")
 
     return ret_value

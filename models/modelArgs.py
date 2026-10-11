@@ -12,6 +12,7 @@ class InputType(StrEnum):
 class TraningSeparatorType(StrEnum):
     PROMPT = 'prompt_id'
     CATEGORY = 'category'
+    REAL_WORLD = 'real_world'
 
 class ModelArguments:
 
