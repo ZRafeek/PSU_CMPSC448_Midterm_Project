@@ -1,33 +1,19 @@
-Training Categories:
-Information Science, Zoology, International Relations, Gender Studies, Film & Photography, Sociology, Computer Science, Tourism & Hospitality, Agriculture, Graphic Design, Economics & finance, Geography & Environment, Disaster Science, History, Engineering & energy, Business & Management, Theatre, Criminology, Mass Communication & Journalism, Pharmacy & Medicine, Nuclear Engineering
-Validation Categories:
-Psychology, Botany, Robotics & AI, English Language
-Test Categories:
-Physics, Law & Legal Studies, Philosophy, Statistics, Political Science
 Results:
 Architecture: CNN
 Input Type: output
 
 Classes:
-ChatGPT, Claude, DeepSeek, Gemini, Grok, Llama, Qwen
+ChatGPT, Claude, Llama
               precision    recall  f1-score   support
 
-     ChatGPT       0.67      0.39      0.49       500
-      Claude       0.94      0.73      0.82       500
-    DeepSeek       0.40      0.79      0.53       500
-      Gemini       0.46      0.91      0.61       500
-        Grok       0.87      0.40      0.55       500
-       Llama       0.95      0.73      0.82       500
-        Qwen       0.85      0.38      0.52       500
+     ChatGPT       0.34      0.59      0.43      1787
+      Claude       0.43      0.33      0.37      1787
+       Llama       0.63      0.31      0.42      1761
 
-    accuracy                           0.62      3500
-   macro avg       0.73      0.62      0.62      3500
-weighted avg       0.73      0.62      0.62      3500
+    accuracy                           0.41      5335
+   macro avg       0.47      0.41      0.41      5335
+weighted avg       0.47      0.41      0.41      5335
 
-[[195  13  84 179   2  13  14]
- [ 19 365  42  69   0   3   2]
- [  4   3 396  90   3   0   4]
- [  5   3  28 455   1   3   5]
- [  4   0 260  30 200   0   6]
- [ 35   2   0  94   1 365   3]
- [ 31   3 172  80  24   2 188]]
+[[1049  504  234]
+ [1108  589   90]
+ [ 938  272  551]]

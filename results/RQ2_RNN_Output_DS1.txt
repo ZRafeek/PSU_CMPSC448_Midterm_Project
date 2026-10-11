@@ -1,0 +1,27 @@
+Results:
+Architecture: LTSM
+Input Type: output
+
+Classes:
+ChatGPT, Claude, DeepSeek, Gemini, Grok, Llama, Qwen
+              precision    recall  f1-score   support
+
+     ChatGPT       0.55      0.52      0.53       450
+      Claude       0.85      0.82      0.84       450
+    DeepSeek       0.54      0.67      0.60       450
+      Gemini       0.61      0.75      0.67       450
+        Grok       0.86      0.62      0.72       450
+       Llama       0.94      0.90      0.92       450
+        Qwen       0.57      0.54      0.56       450
+
+    accuracy                           0.69      3150
+   macro avg       0.70      0.69      0.69      3150
+weighted avg       0.70      0.69      0.69      3150
+
+[[233  26  29  96   4  10  52]
+ [ 25 370  12  31   0   1  11]
+ [ 26  11 301  40  23   0  49]
+ [ 39   4  41 339   1   9  17]
+ [  6   5 100  10 278   0  51]
+ [ 34   1   0  10   0 403   2]
+ [ 59  16  76  34  16   5 244]]

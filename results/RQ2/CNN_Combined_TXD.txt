@@ -1,0 +1,27 @@
+Results:
+Architecture: CNN
+Input Type: combined
+
+Classes:
+ChatGPT, Claude, DeepSeek, Gemini, Grok, Llama, Qwen
+              precision    recall  f1-score   support
+
+     ChatGPT       0.75      0.61      0.67       450
+      Claude       0.91      0.89      0.90       450
+    DeepSeek       0.57      0.82      0.68       450
+      Gemini       0.71      0.84      0.77       450
+        Grok       0.86      0.80      0.83       450
+       Llama       0.95      0.86      0.90       450
+        Qwen       0.78      0.58      0.66       450
+
+    accuracy                           0.77      3150
+   macro avg       0.79      0.77      0.77      3150
+weighted avg       0.79      0.77      0.77      3150
+
+[[275  14  42  63   9   9  38]
+ [  3 400  20  16   0   3   8]
+ [  7   9 371  28  23   0  12]
+ [ 16   7  37 378   1   5   6]
+ [  4   0  72   4 361   0   9]
+ [ 30   2   0  29   0 387   2]
+ [ 32   8 105  13  27   5 260]]

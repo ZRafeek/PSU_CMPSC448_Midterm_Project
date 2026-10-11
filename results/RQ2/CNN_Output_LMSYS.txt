@@ -1,0 +1,19 @@
+Results:
+Architecture: CNN
+Input Type: output
+
+Classes:
+ChatGPT, Claude, Llama
+              precision    recall  f1-score   support
+
+     ChatGPT       0.68      0.72      0.70       260
+      Claude       0.76      0.69      0.72       280
+       Llama       0.69      0.72      0.71       261
+
+    accuracy                           0.71       801
+   macro avg       0.71      0.71      0.71       801
+weighted avg       0.71      0.71      0.71       801
+
+[[186  30  44]
+ [ 48 192  40]
+ [ 41  31 189]]

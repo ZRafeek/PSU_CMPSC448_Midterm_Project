@@ -1,0 +1,19 @@
+Results:
+Architecture: CNN
+Input Type: prompt
+
+Classes:
+ChatGPT, Claude, Llama
+              precision    recall  f1-score   support
+
+     ChatGPT       0.38      0.34      0.36       260
+      Claude       0.44      0.40      0.42       280
+       Llama       0.34      0.41      0.37       261
+
+    accuracy                           0.38       801
+   macro avg       0.39      0.38      0.38       801
+weighted avg       0.39      0.38      0.39       801
+
+[[ 89  64 107]
+ [ 69 113  98]
+ [ 76  79 106]]

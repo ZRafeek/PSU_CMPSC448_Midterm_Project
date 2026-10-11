@@ -1,0 +1,19 @@
+Results:
+Architecture: LTSM
+Input Type: prompt
+
+Classes:
+ChatGPT, Claude, Llama
+              precision    recall  f1-score   support
+
+     ChatGPT       0.36      0.40      0.38       260
+      Claude       0.38      0.30      0.33       280
+       Llama       0.32      0.36      0.34       261
+
+    accuracy                           0.35       801
+   macro avg       0.36      0.35      0.35       801
+weighted avg       0.36      0.35      0.35       801
+
+[[104  66  90]
+ [ 88  84 108]
+ [ 93  73  95]]

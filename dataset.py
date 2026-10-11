@@ -20,19 +20,12 @@ dataset = 'data/raw/TXD-22 A Large-Scale Benchmark Dataset.csv'
 dataset_encoding = 'utf-8-sig'
 responses = 'data/processed/TXD_responses.csv'
 tableHeader = ["prompt","response","llm","category","prompt_id"]
-dataset_categories = [
-    "Computer Science" ,"Engineering & energy", "Economics & finance", "Sociology",
-    "Business & Management", "Pharmacy & Medicine", "English Language", "Law & Legal Studies", "Botany",
-    "Criminology", "Disaster Science", "Geography & Environment", "Graphic Design", "History", "Information Science",
-    "International Relations", "Mass Communication & Journalism", "Nuclear Engineering", "Philosophy", "Physics",
-    "Political Science", "Psychology", "Robotics & AI", "Statistics", "Film & Photography", "Theatre", "Tourism & Hospitality", 
-    "Gender Studies", "Agriculture", "Zoology"
-    ]
 
 # LMSYS Judging LLM-as-a-judge with MT-Bench and Chatbot Arena
 # https://huggingface.co/datasets/lmsys/chatbot_arena_conversations
 responses_rw = 'data/processed/LMSYS_responses.csv'
 tableHeader_rw = ["prompt", "response", "llm"]
+llm_models_rw = ['ChatGPT', 'Claude', 'Llama']
 
 def pre_process_TXD_dataset():
     dataset_responses_per_model = 3000
@@ -108,12 +101,6 @@ def pre_process_LMSYS_dataset():
     df = pd.read_parquet("hf://datasets/lmsys/chatbot_arena_conversations/data/train-00000-of-00001-cced8514c7ed782a.parquet")
     rows = []
 
-    # preprocessing
-    def remove_internal_newlines(match):
-        text = match.group(0)
-        cleaned = text.replace('\n', '\\n').replace('\t', "\\t")
-        return cleaned
-
     for _, row in df.iterrows():
         if row['language'] != 'English': continue
         if 'prompt' in row and pd.notna(row['prompt']):
@@ -140,9 +127,6 @@ def pre_process_LMSYS_dataset():
     formatted_df = pd.DataFrame(rows, columns=tableHeader_rw)
 
     formatted_df.to_csv(responses_rw, index=False, encoding=dataset_encoding)
-
-
-    pass
 
 def tokenize(text):
     return text.lower().split()

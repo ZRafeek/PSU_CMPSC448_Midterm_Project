@@ -5,11 +5,11 @@ import torch
 import pandas as pd
 import numpy as np
 
-from models.modelArgs import ModelArguments, ModelType, InputType, TraningSeparatorType
+from models.modelArgs import ModelArguments, ModelType, InputType, TraningSeparatorType, DatasetType
 
 from models.cnn import CNN
 from models.ltsm import LTSM
-from torch.utils.data import DataLoader, Subset, random_split
+from torch.utils.data import DataLoader, Subset
 from dataset import LLMResponseDataset, collate_fn_cnn, collate_fn_ltsm, build_vocab
 
 from dataset import responses as txd_data_csv_file
@@ -30,11 +30,13 @@ def set_seed(seed = 45):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-def split_data(args : ModelArguments, llm_data, resultsFile):
+def split_data(args : ModelArguments, llm_data):
     separator = args.trainingSeparator
-    if separator == TraningSeparatorType.PROMPT:
-        print("Splitting Data Set by prompt_id")
-        question_ids = llm_data["prompt_id"].unique().tolist()
+    if separator == TraningSeparatorType.PROMPT or separator == TraningSeparatorType.CATEGORY:
+        split = 'category' if separator == TraningSeparatorType.CATEGORY else 'prompt_id'
+        print("Splitting Data Set by ",split)
+
+        question_ids = llm_data[split].unique().tolist()
         random.shuffle(question_ids)
 
         train_end = int(0.70 * len(question_ids))
@@ -46,50 +48,20 @@ def split_data(args : ModelArguments, llm_data, resultsFile):
 
         print("Getting data indicies")
         train_indicies = [
-            i for i, qid in enumerate(llm_data["prompt_id"])
+            i for i, qid in enumerate(llm_data[split])
             if qid in train_ids
         ]
         val_indicies = [
-            i for i, qid in enumerate(llm_data["prompt_id"])
+            i for i, qid in enumerate(llm_data[split])
             if qid in val_ids
         ]
         test_indicies = [
-            i for i, qid in enumerate(llm_data["prompt_id"])
+            i for i, qid in enumerate(llm_data[split])
             if qid in test_ids
         ]
-    elif separator == TraningSeparatorType.CATEGORY:
-        print("Splitting Data Set by category")
-        category_label = llm_data["category"].unique().tolist()
-        random.shuffle(category_label)
 
-        train_end = int(0.70 * len(category_label))
-        val_end = int(0.85 * len(category_label))
-
-        train_ids = set(category_label[:train_end])
-        val_ids = set(category_label[train_end:val_end])
-        test_ids = set(category_label[val_end:])
-
-        print("Getting data indicies")
-        train_indicies = [
-            i for i, qid in enumerate(llm_data["category"])
-            if qid in train_ids
-        ]
-        val_indicies = [
-            i for i, qid in enumerate(llm_data["category"])
-            if qid in val_ids
-        ]
-        test_indicies = [
-            i for i, qid in enumerate(llm_data["category"])
-            if qid in test_ids
-        ]
-        resultsFile.write("Training Categories:\n")
-        resultsFile.writelines([', '.join(train_ids), "\n"])
-        resultsFile.write("Validation Categories:\n")
-        resultsFile.writelines([', '.join(val_ids), "\n"])
-        resultsFile.write("Test Categories:\n")
-        resultsFile.writelines([', '.join(test_ids), "\n"])
     else:
-        print("Using real-world data, no determinable splits possible")
+        print("Using Stratisfied data splits")
         data = llm_data.sample(frac = 1, random_state = args.seed).reset_index(drop=True)
         # random.shuffle(data)
 
@@ -113,6 +85,55 @@ def split_data(args : ModelArguments, llm_data, resultsFile):
 
     return train_indicies, val_indicies, test_indicies
 
+def load_dataset(dataset_type : DatasetType):
+    if dataset_type == DatasetType.LMSYS:
+        path = lmsys_data_csv_file
+        column_names = tableHeader_rw
+    else:
+        path = txd_data_csv_file
+        column_names = tableHeader
+
+    df = pd.read_csv(path, encoding=dataset_encoding)
+    missing = set(column_names) - set(df.columns)
+    if missing:
+        raise ValueError("Missing columns")
+
+    df = df.dropna(subset=column_names).copy()
+
+    for column in tableHeader_rw:
+        df[column] = df[column].astype(str).str.strip()
+
+    df = df[
+        (df['prompt'] != "") & (df['response'] != "") & (df['llm'] != "")
+    ].reset_index(drop=True)
+
+    return df
+
+def prepare_shared_labels(source_df, target_df):
+    source_labels = set(source_df['llm'].unique())
+    target_labels = set(target_df['llm'].unique())
+
+    shared_labels = sorted(source_labels & target_labels)
+
+    if len(shared_labels) < 2:
+        raise ValueError ("Need at least two shared classes for classification")
+
+    print("Shared LLM classes", shared_labels)
+
+    source_df = source_df[
+        source_df["llm"].isin(shared_labels)
+    ].reset_index(drop=True)
+
+    target_df = target_df[
+        target_df["llm"].isin(shared_labels)
+    ].reset_index(drop=True)
+
+    label_to_id = {
+        label:index for index, label in enumerate(shared_labels)
+    }
+
+    return source_df, target_df, label_to_id
+
 def runModel(args : ModelArguments):
     start_time = time.time()
     print("\nNow Running "+args.fileName+":")
@@ -120,48 +141,67 @@ def runModel(args : ModelArguments):
     
     set_seed(args.seed)
 
+    source_df = load_dataset(args.dataset)
+    target_df = load_dataset(args.test_dataset)
+    cross_dataset = args.dataset != args.test_dataset
+
     print("Setting up LLM Data")
-    llm_data = pd.read_csv(lmsys_data_csv_file if args.trainingSeparator == TraningSeparatorType.REAL_WORLD else txd_data_csv_file, encoding=dataset_encoding)
+    if cross_dataset:
+        source_df, target_df, label_to_id = prepare_shared_labels(source_df, target_df)
+    else:
+        label_names = sorted(source_df["llm"].unique())
+        label_to_id = {
+            label: index for index, label in enumerate(label_names)
+        }
     
-    llm_data = llm_data.dropna(subset=tableHeader_rw if args.trainingSeparator == TraningSeparatorType.REAL_WORLD else tableHeader)
+        source_df["label"] = source_df['llm'].map(label_to_id)
+        target_df["label"] = target_df['llm'].map(label_to_id)
 
-    label_names = sorted(llm_data["llm"].unique())
-    label_to_id = {
-        label: index for index, label in enumerate(label_names)
-    }
-
-    llm_data["label"] = llm_data['llm'].map(label_to_id)
+    label_names = sorted(source_df["llm"].unique())
 
     if args.input == "output":
-        texts = llm_data["response"].astype(str)
+        source_texts = source_df["response"].astype(str)
     elif args.input == "prompt":
-        texts = llm_data["prompt"].astype(str)
+        source_texts = source_df["prompt"].astype(str)
     else:
-        texts = (
-            "[PROMPT] "+llm_data["prompt"].astype(str)+
-            " [RESPONSE] "+llm_data["response"].astype(str)
+        source_texts = (
+            "[PROMPT] "+source_df["prompt"].astype(str)+
+            " [RESPONSE] "+source_df["response"].astype(str)
         )
 
-    train_indicies, val_indicies, test_indicies = split_data(args, llm_data, resultsFile)
+    train_indicies, val_indicies, test_indicies = split_data(args, source_df)
 
     # Build Vocabulary from training data
     print("Building vocabulary")
-    training_data_list = texts.iloc[np.array(train_indicies)].tolist()
+    training_data_list = source_texts.iloc[np.array(train_indicies)].tolist()
     vocab = build_vocab(training_data_list)
-    
-    dataset = LLMResponseDataset(
-        data=llm_data,
+
+    source_dataset = LLMResponseDataset(
+        data=source_df,
         vocab=vocab,
         input_type=args.input,
         llm_labels=label_to_id
     )
 
-    train_data_loader = DataLoader(Subset(dataset, train_indicies), batch_size=args.batch_size, shuffle=True, 
-                                   collate_fn=collate_fn_cnn if args.model == ModelType.CNN else collate_fn_ltsm)
-    val_data_loader = DataLoader(Subset(dataset, val_indicies), batch_size=args.batch_size, 
-                                 collate_fn=collate_fn_cnn if args.model == ModelType.CNN else collate_fn_ltsm)
-    test_data_loader = DataLoader(Subset(dataset, test_indicies), batch_size=args.batch_size, 
-                                  collate_fn=collate_fn_cnn if args.model == ModelType.CNN else collate_fn_ltsm)
+    target_dataset = LLMResponseDataset(
+        data=target_df,
+        vocab=vocab,
+        input_type=args.input,
+        llm_labels=label_to_id
+    )
+
+    collate = (collate_fn_cnn if args.model == ModelType.CNN else collate_fn_ltsm)
+
+    train_data_loader = DataLoader(Subset(source_dataset, train_indicies), batch_size=args.batch_size, shuffle=True, 
+                                collate_fn=collate)
+    val_data_loader = DataLoader(Subset(source_dataset, val_indicies), batch_size=args.batch_size, 
+                                collate_fn=collate)
+    if cross_dataset:
+        test_data_loader = DataLoader(target_dataset, batch_size=args.batch_size, 
+                                    collate_fn=collate)
+    else:
+        test_data_loader = DataLoader(Subset(source_dataset, test_indicies), batch_size=args.batch_size, 
+                                    collate_fn=collate)
 
     num_classes = len(label_names)
     vocab_size = len(vocab)
@@ -212,12 +252,10 @@ def runModel(args : ModelArguments):
 
 
 def main():
-    # RQ = 1
     start_time = time.time()
     args = ModelArguments()
     # args.setEpochs(1)
     for RQ in range(1,4):
-    # RQ = 2
         if RQ == 1:
             '''
             RQ1 — Can we identify which LLM generated a response?
@@ -225,11 +263,14 @@ def main():
             generated it. Report the performance of your CNN & RNN performance
             '''
             args.setTrainingSeparator(TraningSeparatorType.PROMPT)
+            args.setDataset(DatasetType.TXD)
+            args.setTestDataset(DatasetType.TXD)
+
             args.setModel(ModelType.CNN)
-            args.setFileName("RQ1_CNN")
+            args.setFileName("RQ1/CNN")
             runModel(args)
             args.setModel(ModelType.LTSM)
-            args.setFileName("RQ1_RNN")
+            args.setFileName("RQ1/RNN")
             runModel(args)
         elif RQ == 2:
             '''
@@ -248,32 +289,36 @@ def main():
 
             For fairness, each model is limited to 1787 sets of data
             '''
-            args.setTrainingSeparator(TraningSeparatorType.REAL_WORLD)
-            args.setModel(ModelType.CNN)
-            args.setFileName("RQ2_CNN_Prompt")
-            args.setInput(InputType.PROMPT)
-            runModel(args)
+            for dataset in DatasetType:
+                args.setTrainingSeparator(TraningSeparatorType.PROMPT if dataset == DatasetType.TXD else TraningSeparatorType.STRATISFIED)
+                args.setDataset(dataset)
+                args.setTestDataset(dataset)
 
-            args.setFileName("RQ2_CNN_Output")
-            args.setInput(InputType.OUTPUT)
-            runModel(args)
+                args.setModel(ModelType.CNN)
+                args.setFileName("RQ2/CNN_Prompt_"+dataset.name)
+                args.setInput(InputType.PROMPT)
+                runModel(args)
 
-            args.setFileName("RQ2_CNN_Combined")
-            args.setInput(InputType.COMBINED)
-            runModel(args)
+                args.setFileName("RQ2/CNN_Output_"+dataset.name)
+                args.setInput(InputType.OUTPUT)
+                runModel(args)
 
-            args.setModel(ModelType.LTSM)
-            args.setFileName("RQ2_RNN_Prompt")
-            args.setInput(InputType.PROMPT)
-            runModel(args)
+                args.setFileName("RQ2/CNN_Combined_"+dataset.name)
+                args.setInput(InputType.COMBINED)
+                runModel(args)
 
-            args.setFileName("RQ2_RNN_Output")
-            args.setInput(InputType.OUTPUT)
-            runModel(args)
+                args.setModel(ModelType.LTSM)
+                args.setFileName("RQ2/RNN_Prompt_"+dataset.name)
+                args.setInput(InputType.PROMPT)
+                runModel(args)
 
-            args.setFileName("RQ2_RNN_Combined")
-            args.setInput(InputType.COMBINED)
-            runModel(args)
+                args.setFileName("RQ2/RNN_Output_"+dataset.name)
+                args.setInput(InputType.OUTPUT)
+                runModel(args)
+
+                args.setFileName("RQ2/RNN_Combined_"+dataset.name)
+                args.setInput(InputType.COMBINED)
+                runModel(args)
         elif RQ == 3:
             '''
             RQ3 — Do LLM fingerprints generalize across tasks or domains?
@@ -285,15 +330,29 @@ def main():
             ii) Are some models more consistently identifiable across domains? 
             iii) Is the classifier learning a general LLM fingerprint or task-specific patterns?
             '''
-            args.setTrainingSeparator(TraningSeparatorType.CATEGORY)
-            args.setModel(ModelType.CNN)
-            args.setFileName("RQ3_CNN")
+            args.setTrainingSeparator(TraningSeparatorType.STRATISFIED)
             args.setInput(InputType.OUTPUT)
+
+            args.setDataset(DatasetType.TXD)
+            args.setTestDataset(DatasetType.LMSYS)
+
+            args.setModel(ModelType.CNN)
+            args.setFileName("RQ3/CNN_TrainTXD")
             runModel(args)
 
             args.setModel(ModelType.LTSM)
-            args.setFileName("RQ3_RNN")
-            args.setInput(InputType.OUTPUT)
+            args.setFileName("RQ3/RNN_TrainTXD")
+            runModel(args)
+
+            args.setDataset(DatasetType.LMSYS)
+            args.setTestDataset(DatasetType.TXD)
+
+            args.setModel(ModelType.CNN)
+            args.setFileName("RQ3/CNN_TrainLMSYS")
+            runModel(args)
+
+            args.setModel(ModelType.LTSM)
+            args.setFileName("RQ3/RNN_TrainLMSYS")
             runModel(args)
         else:
             print('Invalid RQ given, defaulting to Running base model')

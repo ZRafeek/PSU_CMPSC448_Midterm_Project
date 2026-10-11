@@ -12,7 +12,11 @@ class InputType(StrEnum):
 class TraningSeparatorType(StrEnum):
     PROMPT = 'prompt_id'
     CATEGORY = 'category'
-    REAL_WORLD = 'real_world'
+    STRATISFIED = 'stratisfied'
+
+class DatasetType(StrEnum):
+    TXD = 'txd-22'
+    LMSYS = 'lmsys'
 
 class ModelArguments:
 
@@ -24,6 +28,8 @@ class ModelArguments:
         self.seed = 45
         self.fileName = "Default"
         self.trainingSeparator = TraningSeparatorType.PROMPT
+        self.dataset = DatasetType.TXD
+        self.test_dataset = DatasetType.TXD
 
     def setModel(self, model:ModelType):
         self.model = model
@@ -44,4 +50,10 @@ class ModelArguments:
         self.fileName = filename
     
     def setTrainingSeparator(self, trainingSeparator:TraningSeparatorType):
-            self.trainingSeparator = trainingSeparator
+        self.trainingSeparator = trainingSeparator
+
+    def setDataset(self, dataset:DatasetType):
+        self.dataset = dataset
+
+    def setTestDataset(self, dataset:DatasetType):
+        self.test_dataset = dataset
